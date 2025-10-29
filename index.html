@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Платформа Сотрудника | Pro-Task</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
+    
+    <style>
+        /* Общие стили */
+        body {
+            background-color: #e9ecef;
+        }
+        .main-container {
+            max-width: 960px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 0;
+        }
+        
+        /* Стили для формы входа */
+        #login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 500px;
+            padding: 20px;
+        }
+        #login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Контейнер приложения (скрыт до входа) */
+        #app-container {
+            display: none; 
+        }
+
+        /* Стиль для колеса (CSS анимация) */
+        .wheel-container {
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        #fortuneWheel {
+            width: 250px;
+            height: 250px;
+            background: conic-gradient(
+                #ffc107 0% 20%, 
+                #dc3545 20% 40%, 
+                #28a745 40% 60%, 
+                #007bff 60% 80%, 
+                #6f42c1 80% 100%
+            );
+            border-radius: 50%;
+            margin: 20px auto;
+            border: 10px solid #adb5bd;
+            transition: transform 3s ease-out; 
+            position: relative;
+        }
+        .wheel-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: #f8f9fa;
+            border-radius: 50%;
+            border: 5px solid #343a40;
+            z-index: 10;
+        }
+        .wheel-indicator {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid #343a40;
+            z-index: 10;
+        }
+
+        /* Стиль для QR-кода */
+        #qrcode-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    
+    <div class="p-3 bg-primary text-white text-center rounded-top-2">
+        <h2>🛠️ Панель Управления Сотрудника</h2>
+    </div>
+
+    <div id="login-screen">
+        <div class="card" id="login-card">
+            <h4 class="card-title text-center mb-4">Вход в систему</h4>
+            <div class="mb-3">
+                <label for="loginInput" class="form-label">Логин (Из Таблицы)</label>
+                <input type="text" class="form-control" id="loginInput" placeholder="Введите логин">
+            </div>
+            <div class="mb-3">
+                <label for="passwordInput" class="form-label">Пароль (Из Таблицы)</label>
+                <input type="password" class="form-control" id="passwordInput" placeholder="Введите пароль">
+            </div>
+            <button class="btn btn-primary w-100" onclick="handleLogin()">Войти</button>
+            <div id="login-message" class="alert d-none mt-3"></div>
+            <p class="mt-3 text-center text-muted small">
+                Тестовые аккаунты (если не удается загрузить Таблицу):<br>
+                user1/pass1, user2/pass2
+            </p>
+        </div>
+    </div>
+    
+    <div id="app-container">
+
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#home" type="button">Главная</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#wheel" type="button">Колесо Фортуны</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tasks" type="button">Задания</button>
+            </li>
+            <li class="nav-item ms-auto">
+                <button class="btn btn-danger m-2" data-bs-toggle="tab" data-bs-target="#finish" type="button">Закончить Смену</button>
+            </li>
+        </ul>
+
+        <div class="tab-content p-4">
+            
+            <div class="tab-pane fade show active" id="home" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card text-white bg-success">
+                            <div class="card-body">
+                                <h5 class="card-title">💵 Баланс (SUM)</h5>
+                                <p class="card-text fs-2" id="currentBalance">0.00</p>
+                                <p class="card-text small">Аккаунт: <strong id="currentLogin"></strong></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card text-white bg-info">
+                            <div class="card-body">
+                                <h5 class="card-title">🍀 Вращений Колеса</h5>
+                                <p class="card-text fs-2" id="spinsCount">0</p>
+                                <p class="card-text small">Доступное количество вращений.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h4 class="mt-4">💰 Пополнение по ID Чека</h4>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="checkIdInput" placeholder="Введите ID чека (16 цифр)" maxlength="16">
+                    <button class="btn btn-primary" type="button" onclick="simulateDeposit()">Пополнить</button>
+                </div>
+                <div id="message" class="alert d-none"></div>
+            </div>
+
+            <div class="tab-pane fade" id="wheel" role="tabpanel">
+                <h3 class="mb-3">Колесо Удачи!</h3>
+                <p>Ваши шансы: <strong><span id="spinsCountWheel">0</span></strong> вращений осталось.</p>
+                
+                <div class="wheel-container">
+                    <div id="fortuneWheel">
+                        <div class="wheel-center"></div>
+                    </div>
+                    <div class="wheel-indicator"></div>
+
+                    <button class="btn btn-danger btn-lg mt-4" id="spinButton" onclick="spinWheel()" disabled>Крутить Колесо!</button>
+                    <p class="mt-3 fs-5" id="wheelResultDisplay"></p>
+                    <p class="text-muted small">Бонус начисляется сразу.</p>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tasks" role="tabpanel">
+                <h3 class="mb-3">Ежедневные Задания</h3>
+                <p>Выполняйте задания, чтобы увеличить доход и получить вращения для Колеса!</p>
+                
+                <ul class="list-group" id="tasksList">
+                    <li class="list-group-item">Загрузка заданий...</li>
+                </ul>
+            </div>
+            
+            <div class="tab-pane fade" id="finish" role="tabpanel">
+                <h3 class="mb-4">Завершение Смены и Отчет</h3>
+                
+                <div id="qrcode-container" class="mb-4">
+                    <p>Нажмите "Сгенерировать Отчет", чтобы получить QR-код с историей аккаунта:</p>
+                    <button class="btn btn-primary mb-3" onclick="generateReport()">Сгенерировать Отчет</button>
+                    <div id="qrcode" class="border p-2"></div>
+                    <p class="mt-2 text-muted small">Баланс, вращения, история призов.</p>
+                </div>
+                
+                <button class="btn btn-success" id="downloadReportButton" onclick="downloadReport()" disabled>
+                    💾 Скачать Чек-файл (.txt)
+                </button>
+                
+                <div class="alert alert-warning mt-3">
+                    После скачивания файла, **ОБЯЗАТЕЛЬНО** отправьте его менеджеру в Telegram: <a href="https://t.me/elkhattop123" target="_blank">@elkhattop123</a>
+                </div>
+
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" value="" id="confirmSend" disabled>
+                    <label class="form-check-label" for="confirmSend">
+                        Я подтверждаю, что скачал файл и отправил его менеджеру в Telegram.
+                    </label>
+                </div>
+                <button class="btn btn-success btn-lg mt-3" id="completeShiftButton" onclick="completeShift()" disabled>
+                    ✅ Все сделано. Завершить!
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // ----------------------------------------------------------------------
+    // Глобальные переменные и Инициализация 
+    // ----------------------------------------------------------------------
+    
+    // ID ТВОЕЙ ТАБЛИЦЫ, полученный из ссылки: 1HyCtUlU5VDBSvy9grZwMca5Ld5cy3ybR-Jg7WB6sMoE
+    const SHEET_ID = '1HyCtUlU5VDBSvy9grZwMca5Ld5cy3ybR-Jg7WB6sMoE';
+    const GID = '0'; // ID первого листа
+    
+    // URL для получения ВСЕХ данных в формате JSON.
+    // ЭТОТ ЗАПРОС РАБОТАЕТ ТОЛЬКО ПРИ ЗАПУСКЕ КОДА НА ВЕБ-СЕРВЕРЕ (HTTPS://...)!
+    const GOOGLE_SHEET_DATA_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`; 
+
+    // СИМУЛЯЦИОННЫЕ ДАННЫЕ (Используются, если реальная загрузка не удалась из-за CORS)
+    const MOCK_ACCOUNTS_DATA = [
+        { login: "user1", password: "pass1", balance: 150000.00, spins: 3, prize_history: ["Начальный вклад: 150 000.00 SUM"] },
+        { login: "user2", password: "pass2", balance: 50000.00, spins: 1, prize_history: ["Начальный вклад: 50 000.00 SUM"] }
+    ];
+
+    const MOCK_TASKS_LIST = [
+        { id: 1, name: "Поставить 5 лайков в Instagram", reward: 10000, type: "sum" },
+        { id: 2, name: "Пригласить 1 друга", reward: 1, type: "spin" },
+        { id: 3, name: "Оставить 3 комментария", reward: 5000, type: "sum" }
+    ];
+
+    let accountData = {}; 
+    
+    const wheelSegments = [
+        { text: "0 SUM", amount: 0, color: "#999" },
+        { text: "10 000 SUM", amount: 10000, color: "#007bff" },
+        { text: "25 000 SUM", amount: 25000, color: "#28a745" },
+        { text: "50 000 SUM", amount: 50000, color: "#ffc107" },
+        { text: "Джекпот! 100 000 SUM", amount: 100000, color: "#dc3545" }
+    ];
+
+    const spinButton = document.getElementById('spinButton');
+    const wheelElement = document.getElementById('fortuneWheel');
+    const wheelResultDisplay = document.getElementById('wheelResultDisplay');
+    const qrcodeContainer = document.getElementById('qrcode');
+    const downloadReportButton = document.getElementById('downloadReportButton');
+    const confirmSendCheckbox = document.getElementById('confirmSend');
+    const completeShiftButton = document.getElementById('completeShiftButton');
+    const tasksListContainer = document.getElementById('tasksList'); 
+    
+    let isReportGenerated = false;
+
+
+    // ----------------------------------------------------------------------
+    // Функция Парсинга Данных из Google Таблицы
+    // ----------------------------------------------------------------------
+
+    /**
+     * Преобразует данные из формата GVIZ в удобный массив объектов.
+     * @param {object} data - JSON-объект, полученный от Google.
+     * @returns {Array} Массив аккаунтов.
+     */
+    function parseSheetData(data) {
+        if (!data.table || !data.table.rows) return [];
+
+        const accounts = [];
+        const rows = data.table.rows;
+
+        // Начинаем с первой строки данных.
+        // ПРИМЕЧАНИЕ: Если в Таблице есть строка заголовков, начните с 'for (let i = 1; i < rows.length; i++) {'
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].c;
+            
+            // Проверяем, что в строке достаточно столбцов (минимум 5: A, B, C, D, E)
+            if (row.length < 5 || !row[1] || !row[2] || !row[3] || !row[4]) continue;
+
+            const login = row[1] ? (row[1].v || '') : '';       // Столбец B (Индекс 1)
+            const password = row[2] ? (row[2].v || '') : '';    // Столбец C (Индекс 2)
+            const balance = row[3] ? (parseFloat(row[3].v) || 0) : 0; // Столбец D (Индекс 3)
+            const spins = row[4] ? (parseInt(row[4].v) || 0) : 0;     // Столбец E (Индекс 4)
+            
+            if (login && password) {
+                accounts.push({
+                    login: login,
+                    password: password,
+                    balance: balance,
+                    spins: spins,
+                    prize_history: [`Начальный баланс: ${balance.toLocaleString('ru-RU')} SUM`]
+                });
+            }
+        }
+        return accounts;
+    }
+
+
+    // ----------------------------------------------------------------------
+    // Основная Логика Входа: Загрузка + Проверка
+    // ----------------------------------------------------------------------
+    
+    async function handleLogin() {
+        const loginInput = document.getElementById('loginInput').value.trim();
+        const passwordInput = document.getElementById('passwordInput').value.trim();
+        const loginMessage = document.getElementById('login-message');
+        loginMessage.classList.add('d-none');
+        loginMessage.classList.remove('alert-success', 'alert-danger', 'alert-warning');
+        
+        // Показываем, что идет процесс
+        loginMessage.classList.add('alert-warning');
+        loginMessage.textContent = '... Проверка данных и попытка загрузки из Google Таблицы ...';
+        loginMessage.classList.remove('d-none');
+        
+        let allAccounts = [];
+
+        try {
+            // *** ШАГ 1: ПОПЫТКА ЗАГРУЗКИ РЕАЛЬНЫХ ДАННЫХ ***
+            const response = await fetch(GOOGLE_SHEET_DATA_URL);
+            const text = await response.text();
+            
+            // Очистка JSON от Google-оболочки (нужно, потому что Google возвращает текст, а не чистый JSON)
+            const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+            const data = JSON.parse(jsonString);
+
+            allAccounts = parseSheetData(data);
+            
+            console.log("✅ Успешно загружено реальных аккаунтов:", allAccounts.length);
+            loginMessage.textContent = '✅ Данные из Таблицы загружены. Проверяю логин...';
+            loginMessage.classList.replace('alert-warning', 'alert-success');
+
+
+        } catch (error) {
+            // *** ШАГ 1.1: ЕСЛИ РЕАЛЬНАЯ ЗАГРУЗКА НЕ УДАЛАСЬ (СЛУЧИТСЯ НА ЛОКАЛЬНОМ ФАЙЛЕ) ***
+            console.error("❌ Ошибка загрузки Таблицы (вероятно, из-за CORS или Таблица не опубликована). Использую тестовые данные.", error);
+            allAccounts = MOCK_ACCOUNTS_DATA;
+            loginMessage.textContent = '⚠️ Не удалось загрузить Таблицу. Использую тестовые аккаунты. См. консоль.';
+            loginMessage.classList.replace('alert-warning', 'alert-danger');
+        }
+
+        // -------------------------------------------------------------------
+        // ШАГ 2: ПОИСК ПОЛЬЗОВАТЕЛЯ
+        // -------------------------------------------------------------------
+
+        const user = allAccounts.find(acc => acc.login === loginInput && acc.password === passwordInput);
+        
+        if (user) {
+            // УСПЕШНЫЙ ВХОД
+            accountData = {
+                login: user.login,
+                password: user.password,
+                balance: user.balance,
+                spins: user.spins,
+                // Используем историю, загруженную из таблицы
+                prizeHistory: user.prize_history, 
+                transactionHistory: user.prize_history.slice() 
+            };
+            
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            document.getElementById('currentLogin').textContent = accountData.login; 
+            
+            updateTasksList(MOCK_TASKS_LIST);
+            updateUI();
+            
+        } else {
+            // ОШИБКА ВХОДА
+            loginMessage.textContent = '❌ Неверный логин или пароль.';
+            loginMessage.classList.replace('alert-success', 'alert-danger');
+        }
+    }
+
+
+    // ----------------------------------------------------------------------
+    // Функции Обновления Интерфейса и Логики
+    // ----------------------------------------------------------------------
+
+    function updateTasksList(tasks) {
+        tasksListContainer.innerHTML = ''; 
+        
+        tasks.forEach(task => {
+            const rewardText = task.type === 'sum' 
+                               ? `+${task.reward.toLocaleString('ru-RU')} SUM` 
+                               : `+${task.reward} Вращение`;
+            
+            const listItem = document.createElement('li');
+            listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+            listItem.innerHTML = `
+                <span>${task.name} (${rewardText})</span>
+                <button class="btn btn-warning btn-sm" onclick="completeTask(${task.id}, ${task.reward}, '${task.type}')">Выполнить</button>
+            `;
+            tasksListContainer.appendChild(listItem);
+        });
+    }
+
+    function completeTask(taskId, reward, type) {
+        const taskName = MOCK_TASKS_LIST.find(t => t.id === taskId).name;
+        
+        if (type === 'sum') {
+            accountData.balance += reward;
+            accountData.transactionHistory.push(`Задание "${taskName}" выполнено: +${reward.toLocaleString('ru-RU')} SUM`);
+            alert(`Задание выполнено! Начислено: ${reward.toLocaleString('ru-RU')} SUM`);
+        } else if (type === 'spin') {
+            accountData.spins += reward;
+            accountData.transactionHistory.push(`Задание "${taskName}" выполнено: +${reward} Вращение`);
+            alert(`Задание выполнено! Начислено: ${reward} Вращение.`);
+        }
+        
+        updateUI();
+    }
+
+
+    function updateUI() {
+        if (!accountData.login) return; 
+
+        const balanceElements = document.querySelectorAll('#currentBalance');
+        const spinsElements = document.querySelectorAll('#spinsCount, #spinsCountWheel');
+
+        balanceElements.forEach(el => el.textContent = `${accountData.balance.toLocaleString('ru-RU')} SUM`);
+        spinsElements.forEach(el => el.textContent = accountData.spins);
+        
+        spinButton.disabled = accountData.spins <= 0;
+        
+        if (spinButton.disabled) {
+            spinButton.textContent = "Нет доступных вращений";
+        } else {
+             spinButton.textContent = "Крутить Колесо!";
+        }
+        
+        completeShiftButton.disabled = !(downloadReportButton.disabled === true && confirmSendCheckbox.checked);
+    }
+    
+    function simulateDeposit() {
+        const checkIdInput = document.getElementById('checkIdInput');
+        const checkId = checkIdInput.value.trim();
+        const messageDisplay = document.getElementById('message');
+        messageDisplay.className = 'alert d-none'; 
+        
+        if (checkId.length !== 16 || !/^\d+$/.test(checkId)) {
+            messageDisplay.classList.remove('d-none');
+            messageDisplay.classList.add('alert-danger');
+            messageDisplay.textContent = '❌ Неверный формат ID чека. Должно быть ровно 16 цифр.';
+            return;
+        }
+
+        const amountString = checkId.substring(4, 8);
+        const depositAmount = parseInt(amountString) * 100; 
+
+        if (depositAmount <= 0) {
+             messageDisplay.classList.remove('d-none');
+             messageDisplay.classList.add('alert-danger');
+             messageDisplay.textContent = '❌ ID чека не содержит сумму пополнения.';
+             return;
+        }
+
+        accountData.balance += depositAmount;
+        accountData.transactionHistory.push(`Пополнение по ID ${checkId}: ${depositAmount.toLocaleString('ru-RU')} SUM`);
+        updateUI();
+
+        messageDisplay.classList.remove('d-none');
+        messageDisplay.classList.add('alert-success');
+        messageDisplay.textContent = `✅ Успешное пополнение! На счет зачислено: ${depositAmount.toLocaleString('ru-RU')} SUM`;
+        checkIdInput.value = '';
+    }
+
+    function spinWheel() {
+        if (accountData.spins <= 0) return;
+
+        spinButton.disabled = true;
+        wheelResultDisplay.textContent = "Крутим...";
+        wheelResultDisplay.className = "mt-3 fs-5 text-warning";
+        accountData.spins--; 
+
+        const finalPrizeIndex = Math.floor(Math.random() * wheelSegments.length);
+        const winningPrize = wheelSegments[finalPrizeIndex];
+        
+        const segmentAngle = 360 / wheelSegments.length; 
+        const minRotation = 360 * 5; 
+        const targetAngle = minRotation + (360 - (finalPrizeIndex * segmentAngle) - (segmentAngle / 2)); 
+
+        wheelElement.style.transform = `rotate(${targetAngle}deg)`;
+        
+        setTimeout(() => {
+            if (winningPrize.amount > 0) {
+                accountData.balance += winningPrize.amount;
+                accountData.prizeHistory.push(`Выигрыш в Колесе Фортуны: ${winningPrize.amount.toLocaleString('ru-RU')} SUM`);
+                wheelResultDisplay.textContent = `🎉 Поздравляем! Вы выиграли ${winningPrize.amount.toLocaleString('ru-RU')} SUM!`;
+                wheelResultDisplay.className = "mt-3 fs-5 text-success";
+            } else {
+                wheelResultDisplay.textContent = `😔 Увы! В этот раз пусто.`;
+                wheelResultDisplay.className = "mt-3 fs-5 text-danger";
+            }
+
+            updateUI(); 
+            spinButton.disabled = false;
+
+        }, 3500); 
+    }
+
+    function generateReport() {
+        if (!accountData.login) return; 
+        
+        const reportText = `
+АККАУНТ ОТЧЕТ
+----------------------------------------
+Логин: ${accountData.login}
+Пароль: ${accountData.password}
+Текущий Баланс (SUM): ${accountData.balance.toLocaleString('ru-RU')}
+Остаток вращений: ${accountData.spins}
+----------------------------------------
+ИСТОРИЯ ПРИЗОВ КОЛЕСА ФОРТУНЫ:
+${accountData.prizeHistory.join('\n')}
+----------------------------------------
+ИСТОРИЯ ТРАНЗАКЦИЙ:
+${accountData.transactionHistory.join('\n')}
+----------------------------------------
+Дата/Время Отчета: ${new Date().toLocaleString('ru-RU')}
+        `;
+        
+        const qr = qrcode(0, 'L');
+        qr.addData(reportText);
+        qr.make();
+        
+        qrcodeContainer.innerHTML = qr.createImgTag(5); 
+        
+        downloadReportButton.disabled = false;
+        confirmSendCheckbox.disabled = false;
+        isReportGenerated = true;
+
+        window.currentReportText = reportText;
+    }
+
+    function downloadReport() {
+        if (!isReportGenerated) return;
+
+        const blob = new Blob([window.currentReportText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Отчет_Смены_${accountData.login}_${Date.now()}.txt`;
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        downloadReportButton.disabled = true;
+        updateUI();
+    }
+
+    function completeShift() {
+        if (confirmSendCheckbox.checked) {
+            alert(`✅ Смена для аккаунта ${accountData.login} успешно завершена!`);
+            // В реальном проекте здесь будет код для отправки финальных данных обратно в Google Таблицу
+            location.reload(); 
+        } else {
+            alert("Пожалуйста, подтвердите, что вы скачали и отправили файл менеджеру!");
+        }
+    }
+    
+    confirmSendCheckbox.addEventListener('change', updateUI);
+    
+    document.getElementById('loginInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') handleLogin();
+    });
+    document.getElementById('passwordInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') handleLogin();
+    });
+    
+</script>
+</body>
+</html>
